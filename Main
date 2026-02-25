@@ -1,0 +1,178 @@
+# Asteroid-Trajectory
+import math
+
+# === Constants ===
+G = 6.67430e-11                                 # m^3/kg/s^2 (Gravitational Constant)
+g0 = 9.81                                       # m/s^2 (Standard gravity)
+AU = 1.496e11                                   # meters
+M_star = 1.989e30                               # kg (Sun-like)
+M_a= 5.972e24                                   # kg 
+
+# === Spacecraft Settings ===
+Fuel_mass = 2000                                #kg
+Spacecraft_mass= 1920                           #kg
+Initial_mass= Fuel_mass+Spacecraft_mass
+Isp = 320           
+mew = G*M_star   
+mew_a= G*M_a       
+radius_a = 6371e3       
+launcher_delta_v = 8000                        #m/s (Capability of your launch rocket's final stage)Applicable for Hohmann transfer
+
+# === Orbital Radii for Epsilon System ===
+r_a= 1 * AU
+r_b = 3.4 * AU       # Planet B (assist 1)
+r_d = 9 * AU         # Planet D (assist 2)
+r_c = 40 * AU        # Final planet C
+
+# === Final Planet C Characteristics ===
+mass_c = 0.1 * 1.9e27       # kg
+radius_c = 2.5e7            # m  (Neptune like)
+mew_c = G*mass_c
+r_p_insert = 1.1 * radius_c
+r_a_insert = 20 * radius_c
+max_insertion_dv = 10000 # m/s
+
+# === Hohmann Transfer to Planet B ===
+a1 = (r_a+ r_b) / 2
+v_orbital_a= math.sqrt(G*M_star/r_a)
+v_orbital_b= math.sqrt(G * M_star / r_b)
+v_periapsis = math.sqrt(mew*((2/r_a)-(1/a1)))           #Velocity in Transfer Orbit at Earth's Distance
+v_apoapsis = math.sqrt(mew*((2/r_b)-(1/a1)))            #Velocity in Transfer Orbit at Jupiter's Distance
+
+V_inifinity_a= v_periapsis-v_orbital_a                  # Velocity after the Earth's Gravitaional escape.
+
+# --- Calculation of the LEO burn (more accurate)---
+r_LEO = radius_a + 300e3  # LEO at 300 km altitude
+v_LEO = math.sqrt(mew_a / r_LEO)
+v_escape_LEO = math.sqrt(2 * mew_a / r_LEO)
+delta_v_required_LEO = math.sqrt(V_inifinity_a**2 + v_escape_LEO**2) - v_LEO
+
+delta_v1 = v_periapsis -v_orbital_a                     # The velocity change relative to the sun to get into the transfer orbit
+delta_v2 = v_orbital_b- v_apoapsis
+delta_v_total = abs(delta_v1) + abs(delta_v2)
+T1 = math.pi * math.sqrt(a1**3 / (G * M_star)) / (60*60*24*365.25)
+
+#The alternative method to achieve the high initial velocity and high aarival velocity at planet B.
+# === Define the High-Energy Departure ===
+v_infinity_sun = 12570  # m/s (Hyperbolic excess velocity relative to the Sun)
+C3 = v_infinity_sun**2
+v_sc_at_B = math.sqrt((2 * mew / r_b) + C3)
+Time_a_to_b= 0.85 #years
+
+print("=== PHASE 1: Earth to Planet B by Hohmann Transfer ===")
+print(f"Orbital velocity of Planet A: {v_orbital_a/1000:.2f} km/s")
+print(f"Orbital velocity of Planet B:{ v_orbital_b/1000:.2f} km/s")
+print(f"Hyperbolic Excess velocity of Disko after Earth Gravitational Escape: {V_inifinity_a/1000:.2f} km/s")
+print(f"Delta-V required for the burn from LEO: {delta_v_required_LEO/1000:.2f} km/s")
+if launcher_delta_v >= delta_v_required_LEO:
+    print("Conclusion: Your launcher's capability is sufficient for the escape and transfer burn.")
+else:
+    print("Conclusion: Your launcher is not powerful enough. You need to use your on-board fuel or a more powerful launcher.")
+print("===Hohmann Transfer Details:===")
+print(f"The delta_v1: {delta_v1/1000:.2f} km/s")
+print(f"The delta_v2: {delta_v2/1000:.2f} km/s")
+print(f"Total delta-v: {delta_v_total/1000:.2f} km/s")
+print(f"Transfer time for Hohmann Transfer is : {T1:.2f} years\n")
+print("=====The high initial velocity method===(Approcable method) for Transfer from Planet A to B")
+print(f"The Hyperbolic Velocity of Spacecraft relative to Sun : {v_infinity_sun/1000:.2f} km/s")
+print(f"Space craft arrival velocity at Planet B:{v_sc_at_B/1000:.2f} km/s")
+print(f"The High Velocity transfer for the spacecraft needs the time from Planet A to Planet B: {Time_a_to_b} years\n")
+
+
+# === Gravity Assist at Planet B (Jupiter-like) ===
+mass_b = 1.9e27
+mew_b = G * mass_b
+v_orbital_b = math.sqrt(G * M_star / r_b)
+
+v_inf_b = abs(v_sc_at_B - v_orbital_b)              
+a2 = (r_b + r_d) / 2
+v_transfer_b = math.sqrt(mew * ((2 / r_b) - (1 / a2)))
+
+V_decrease_b = abs(v_transfer_b - v_sc_at_B)
+
+# The deflection angle will be negative, correctly modeling the deceleration assist
+if abs(V_decrease_b / (2 * v_inf_b)) > 1:
+    print("Warning: The required velocity boost is too large for the gravity assist to provide.")
+    Deflection_angle_b = math.pi
+else:
+    Deflection_angle_b = 2 * (math.asin(V_decrease_b / (2 * v_inf_b)))
+
+Deflection_angle_b_degree = math.degrees(Deflection_angle_b)
+
+# The flyby distance formula now uses the angle in radians (Deflection_angle_b)
+if Deflection_angle_b == 0:
+    rp_b_required = "Infinite"
+else:
+    rp_b_required = (mew_b / (v_inf_b**2)) * ((1 / math.sin(Deflection_angle_b / 2)) - 1)
+
+Time_of_flight_b_to_d = math.pi * math.sqrt((a2**3) / mew)
+Time_of_flight_b_to_d_years = Time_of_flight_b_to_d / (365 * 24 * 3600)
+
+V_arrival_d = math.sqrt(mew * ((2 / r_d) - (1 / a2)))
+
+print("=====Gravity assist at B=====")
+print(f"Space craft arrival velocity at Planet B:{v_sc_at_B/1000:.2f} km/s")
+print(f"Hyperbolic excess velocity for gravity assist: {v_inf_b/1000:.2f} km/s")
+print(f"velocity of decrease is : {V_decrease_b/1000:.2f} km/s")
+print(f"velocity at the arrival of d:{V_arrival_d/1000:.2f} km/s")
+print(f"Deflection angle for gravity assist: {Deflection_angle_b_degree:.2f}")
+print(f"Flyby Distance from b: {rp_b_required/1000:.2f} km")
+print(f"Time of flight from b to d: {Time_of_flight_b_to_d_years:.2f} Years\n")
+
+
+# === Gravity Assist at Planet d (saturn-like) ===
+mass_d= 0.3*1.97e27
+mew_d=G* mass_d
+a3= (r_d+r_c)/2
+v_sc_at_D = math.sqrt((mew)*((2/r_d) - (1/a3)))
+V_boost_d= abs(v_sc_at_D-V_arrival_d)
+v_orbital_d= math.sqrt(G*M_star/r_d)
+V_inf_d= abs(V_arrival_d-v_orbital_d)
+
+v_after_d= v_orbital_d+V_inf_d
+
+v_arrival_c= math.sqrt(v_after_d**2 - (2*mew/r_d)+(2*mew/r_c))
+
+# Time of flight D to C (approximation for a high-energy hyperbolic trajectory)
+distance_d_to_c = abs(r_c - r_d)
+time_d_to_c_years = (distance_d_to_c / v_after_d) / (365*24*3600)
+
+print("======Gravity assist by D=====")
+print(f"Velocity of arrival at D: {V_arrival_d/1000:.2f} km/s")
+print(f"Orbital Velocity of Planet D:{v_orbital_d/1000:.2f} km/s")
+print(f"Velocity of spacecraft needed to be on a hohmann transfer: {v_sc_at_D/1000:.2f} km/s")
+print(f"Velocity of boost from Planet D: {V_boost_d/1000:.2f} km/s")
+print(f"Velocity of hyperbolic excess Velocity at Planet D: {V_inf_d/1000:.2f} km/s")
+print(f"Velocity after the gravity assist of d: {v_after_d/1000:.2f} km/s\n")
+print(f"Heliocentric velocity of arrival for Planet C: {v_arrival_c/1000:.2f} km/s")
+print(f"Approximate Time to reach Planet C: {time_d_to_c_years:.2f} years")
+
+#=====Orbital Insertion of Planet C====
+a_final= (r_p_insert+r_a_insert)/2
+
+#Speed of the planet when it makes the closest approach to the planet.
+
+v_orbital_c= math.sqrt(G*M_star/r_c)
+v_inf_c= abs(v_arrival_c-v_orbital_c)
+
+V_hyperbola_periapsis= math.sqrt((v_inf_c**2)+(2*mew_c/r_p_insert))
+V_ellipse_periapsis= math.sqrt(mew_c*((2/r_p_insert)-(1/a_final)))
+
+Delta_v_insertion= abs(V_hyperbola_periapsis-V_ellipse_periapsis)
+
+#Calculation of fuel
+final_mass= Initial_mass/math.exp(Delta_v_insertion/(Isp*g0))
+fuel_mass= Initial_mass-final_mass
+
+
+print("====Final Stage====")
+print(f"orbital velocity of c: {v_orbital_c/1000:.2f} km/s")
+print(f"Arrival velocity of c: {v_arrival_c/1000:.2f} km/s")
+print(f"Hyperbolic velocity of at c: {v_inf_c/1000:.2f} km/s")
+print(f"Delta_v Required for orbital insertion burn: {Delta_v_insertion/1000:.2f} km/s")
+print(f"Mass of fuel required for Orbital Insertion: {fuel_mass:.1f} kg\n")
+
+total_mission_time= time_d_to_c_years+Time_of_flight_b_to_d_years+Time_a_to_b
+
+print("==== FINAL MISSION SUMMARY =====")
+print(f"Total time of flight to Planet C: {total_mission_time:.2f} years")
